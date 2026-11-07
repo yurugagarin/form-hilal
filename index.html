@@ -230,6 +230,8 @@ textarea.inp{height:auto;min-height:84px;padding:12px 14px;text-align:left;font-
 .sinp::placeholder{color:var(--ink4);font-weight:700}
 .sok{height:52px;border-radius:15px;border:1.5px solid var(--line);background:var(--card2);display:flex;align-items:center;justify-content:center;color:var(--ink4);transition:all .18s var(--ease)}
 .sok svg{width:24px;height:24px}
+.srow.lv{grid-template-columns:24px 1.45fr 16px 1fr 56px}
+select.sel{-webkit-appearance:none;appearance:none;font-size:15px;font-weight:800;text-align:center;text-align-last:center;padding:0 6px;color:var(--ink)}
 .srow.done .sok{background:var(--grn);border-color:var(--grn);color:#fff}
 .srow.done .sinp{background:var(--grn-t);border-color:#c4dfcf;color:var(--grn2)}
 .srow .del{color:var(--ink4);font-size:18px;height:52px}
@@ -396,7 +398,7 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--ca
    durur. İsteğe bağlı: yedek dosyası, GitHub Gist ile bulut yedeği,
    dinlenme bildirimi (ağabeyin FORM sunucusu üzerinden).
    ============================================================ */
-var VER='1.0 · 6 Kas 2026';
+var VER='1.1 · 7 Kas 2026';
 var KEY='fk:data';          /* ana veri — ağabeyin FORM'u 'emre:form:*' kullanıyor, çakışmaz */
 var DEVKEY='fk:device';     /* yalnız bu cihaza ait: bildirim aboneliği, son yedek tarihi … */
 var PUSHURL='https://form-timer.yurugagarin.workers.dev';
@@ -460,6 +462,8 @@ var DEF={
   maint:null, maintSrc:'',
   targets:{kcal:null,protein:null,steps:10000,sleep:7.5,kcalAuto:true,protAuto:true},
   gymDays:[1,3,5],
+  mode:'ev',          /* 'ev' | 'salon' — antrenman programı */
+  modeStart:{},       /* her programa ilk geçiş tarihi (öğrenme dönemi buna göre) */
   cycle:true,
   days:{},
   sync:{token:'',gist:'',last:0},
@@ -475,6 +479,9 @@ function normalize(){
   });
   if(!Array.isArray(S.gymDays))S.gymDays=d.gymDays;
   if(!S.days||typeof S.days!=='object')S.days={};
+  if(S.mode!=='ev'&&S.mode!=='salon')S.mode='ev';
+  if(!S.modeStart||typeof S.modeStart!=='object')S.modeStart={};
+  if(S.profile.startDate&&!S.modeStart[S.mode])S.modeStart[S.mode]=S.profile.startDate;
 }
 function load(){
   try{var t=localStorage.getItem(KEY);S=t?JSON.parse(t):null;}catch(e){S=null;}
@@ -626,11 +633,93 @@ var EX={
    warn:'Gövdeyle sallanma. Gövdeyi hafif öne eğmek kalçayı daha iyi çalıştırır.',
    alt:'Kabloda ayakta yana bacak açma.'}
 };
-var WO={
- A:{name:'Antrenman A',sub:'Bacak · kalça · sırt · göğüs',ex:['legpress','hipthrust','pulldown','chestpress','legcurl']},
- B:{name:'Antrenman B',sub:'Bacak · kalça · sırt · omuz',ex:['goblet','backext','cablerow','shoulderpress','abductor']}
+
+/* ============ EV PROGRAMI ============
+   Evdeki malzeme: 2 adet 6 kg dambıl, kanepe/sandalye, havlu (yürüyüş bandı yalnız adım için).
+   Ağırlık sabit olduğu için ilerleme KİLOYLA değil SEVİYEYLE: ağırlıksız → 6 kg → 2×6 kg →
+   tek bacak / yavaş tempo. Tek bacak hareketler hafif dambılla bile kası yeterince yükler.
+   Her seviyenin "etkin yükü" (dambıl + vücut ağırlığı payı, tek bacakta ×1,8, yavaş tempoda
+   ×1,2–1,35) yalnız güç karşılaştırması içindir; seviyeler arası kıyas bozulmasın diye. */
+var EXH={
+ e_goblet:{n:'Goblet squat',en:'dumbbell goblet squat beginner',fig:'goblet',r:[10,15],rest:90,bwAdd:0.7,o0:1,
+   opts:[{s:'Ağırlıksız',n:'Ağırlıksız',kg:0},{s:'6 kg',n:'6 kg (tek dambıl göğüste)',kg:6},{s:'2 × 6 kg',n:'2 × 6 kg (iki dambıl omuzlarda)',kg:12}],
+   mus:'Ön bacak · kalça',
+   why:'Squat\'ı öğrenmenin en güvenli yolu: ağırlık önde olduğu için gövde kendiliğinden dik kalır.',
+   how:['Dambılı dikey olarak göğsünün önünde iki elinle tut (2 × 6 kg seviyesinde iki dambılı omuzlarında tut).',
+        'Ayaklar omuz genişliğinde, parmak uçları hafif dışa. Kalçanı geriye ve aşağı indir.',
+        'Dizlerin ayak parmaklarının yönünde açılsın. Topuklarınla iterek kalk.'],
+   warn:'Topukların yerden kalkmasın, sırtın dik kalsın. Rahat inebildiğin derinliğe in.',
+   alt:'Sandalyeye oturup kalkma.'},
+ e_hipthrust:{n:'Hip thrust (kanepede)',en:'hip thrust on couch dumbbell',fig:'hipThrust',r:[10,15],rest:90,bwAdd:0.5,o0:0,
+   opts:[{s:'6 kg',n:'6 kg',kg:6},{s:'2 × 6 kg',n:'2 × 6 kg',kg:12},{s:'Tek bacak',n:'Tek bacak, ağırlıksız (her bacak ayrı)',kg:0,x:1.8},{s:'Tek bacak+6',n:'Tek bacak + 6 kg (her bacak ayrı)',kg:6,x:1.8}],
+   mus:'Kalça (gluteus) · arka bacak',
+   why:'Kalçayı en doğrudan çalıştıran hareket. Bele yük bindirmez.',
+   how:['Kürek kemiklerini kanepenin kenarına yasla, ayaklar kalça genişliğinde yerde.',
+        'Dambılı kalça kemiğinin üstüne koy, iki elinle tut.',
+        'Topuklarınla iterek kalçanı kaldır: tepede omuz–kalça–diz düz bir çizgi. 1 saniye sık, yavaşça in.'],
+   warn:'Kanepe kaymasın; arkası duvara dayalı olsun. Tepede belini kavislendirme, hareket kalçadan gelsin.',
+   alt:'Yerde kalça köprüsü.'},
+ e_row:{n:'Tek kol dambıl row',en:'one arm dumbbell row form',fig:'rowOne',r:[10,15],rest:60,side:'her kol',o0:0,
+   opts:[{s:'6 kg',n:'6 kg',kg:6},{s:'6 kg yavaş',n:'6 kg · 3 sn yavaş indir',kg:6,x:1.2},{s:'6 kg yavaş+bekle',n:'6 kg · üstte 1 sn bekle, 3 sn yavaş indir',kg:6,x:1.35}],
+   mus:'Sırt (kanatlar) · arka omuz · ön kol',
+   why:'Evdeki tek ağırlıkla sırtı çalıştırmanın en etkili yolu. Duruşu dikleştirir.',
+   how:['Bir elini ve aynı taraftaki dizini kanepeye ya da sandalyeye koy, sırtın düz.',
+        'Dambılı kalçana doğru çek, dirseğin gövdeye yakın geçsin.',
+        'Yavaşça indir. Bir kol bitince diğerine geç; dinlenme iki kol bittikten sonra.'],
+   warn:'Gövdeyi döndürüp hile yapma; sadece kol ve sırt hareket etsin.',
+   alt:'İki elle eğilerek dambıl row.'},
+ e_pushup:{n:'Şınav',en:'push up progression for women beginners',fig:'pushUp',r:[8,12],rest:90,o0:0,
+   opts:[{s:'Eller kanepede',n:'Eller kanepede (eğik şınav)',kg:0,bw:0.42},{s:'Dizler yerde',n:'Dizler yerde',kg:0,bw:0.5},{s:'Tam şınav',n:'Tam şınav',kg:0,bw:0.65}],
+   mus:'Göğüs · ön omuz · arka kol',
+   why:'Evde göğüs ve kolların arkası için en iyi hareket; seviyeleri sayesinde aylarca ilerler.',
+   how:['Ellerin omuz genişliğinden biraz geniş. Baştan dizlere (ya da ayaklara) düz bir çizgi.',
+        'Göğsün ellerinin arasına yaklaşana kadar in; dirsekler gövdeyle 45° açı yapsın.',
+        'İterek kalk; kalça düşmesin, havaya da kalkmasın.'],
+   warn:'Kalça sarkıyorsa ya da tam inemiyorsan bir alt seviyeye dön.',
+   alt:'Duvara karşı şınav.'},
+ e_split:{n:'Bulgarian split squat',en:'bulgarian split squat beginner dumbbell',fig:'splitSquat',r:[8,12],rest:90,bwAdd:0.7,side:'her bacak',o0:0,
+   opts:[{s:'Ağırlıksız',n:'Ağırlıksız',kg:0,x:1.8},{s:'6 kg',n:'6 kg (tek dambıl göğüste)',kg:6,x:1.8},{s:'2 × 6 kg',n:'2 × 6 kg (iki elde)',kg:12,x:1.8}],
+   mus:'Ön bacak · kalça',
+   why:'Tek bacakla yapıldığı için vücut ağırlığın ikiye bölünmez; hafif dambılla bile bacak ve kalçayı ağır yükler.',
+   how:['Kanepeye sırtını dön, bir ayağının üstünü kanepeye koy. Ön ayağın yaklaşık bir büyük adım önde.',
+        'Arka dizini yere doğru indir; gövden hafif öne eğik, ön dizin ayak ucunun yönünde.',
+        'Ön topuğunla iterek kalk. Bir bacağın setleri bitince diğerine geç.'],
+   warn:'Dengen kayarsa bir elinle duvardan destek al. Ön dizin içe kaçmasın.',
+   alt:'Geriye adım lunge.'},
+ e_slide:{n:'Havluyla leg curl',en:'sliding leg curl towel',fig:'slideCurl',r:[8,12],rest:90,bwAdd:0.3,o0:0,
+   opts:[{s:'Sadece uzat',n:'Sadece yavaşça uzat (geri çekmeden)',kg:0,x:0.6},{s:'İki bacak',n:'İki bacak',kg:0,x:1},{s:'Tek bacak',n:'Tek bacak (her bacak ayrı)',kg:0,x:1.8}],
+   mus:'Arka bacak (hamstring) · kalça',
+   why:'Evde arka bacağı doğrudan çalıştıran tek hareket; bele yük bindirmez.',
+   how:['Sırtüstü yat, topukların kaygan zemindeki bir havlunun (ya da çorabın) üstünde.',
+        'Kalçanı kaldır, köprü pozisyonuna gel.',
+        'Kalça havadayken bacaklarını yavaşça uzat, sonra topuklarını kalçana doğru geri çek. İlk seviyede sadece uzat, sonra kalçanı indirip baştan başla.'],
+   warn:'Halı üstünde kaymaz; parke ya da fayans gerekir. Hareket boyunca kalçan yere değmesin.',
+   alt:'Yerde tek bacak kalça köprüsü.'},
+ e_ohp:{n:'Oturarak dambıl omuz press',en:'seated dumbbell shoulder press beginner',fig:'ohp',r:[8,12],rest:90,o0:0,
+   opts:[{s:'2 × 6 kg',n:'2 × 6 kg',kg:12},{s:'2 × 6 kg yavaş',n:'2 × 6 kg · 3 sn yavaş indir',kg:12,x:1.2}],
+   mus:'Omuz · arka kol',
+   why:'Omuzlara şekil verir; omuz genişleyince bel daha ince görünür.',
+   how:['Sandalyeye dik otur, sırtın yaslı. Dambıllar omuz hizasında, avuçlar önde.',
+        'Dambılları baş üstüne it, kolların neredeyse düzleşsin.',
+        'Yavaşça omuz hizasına indir.'],
+   warn:'Belini kavislendirme. 8 tekrar çıkmıyorsa önce tek kolla sırayla yap.',
+   alt:'Tek kol dambıl omuz press.'}
 };
-var WARMUP='Her hareketin ilk setinden önce, o günkü kilonun yarısıyla 8–10 tekrarlık bir ısınma seti yap. Ayrı ısınma koşusu gerekmez.';
+Object.keys(EXH).forEach(function(k){EX[k]=EXH[k];});
+
+var PROG={
+ salon:{
+   A:{name:'Antrenman A',sub:'Bacak · kalça · sırt · göğüs',ex:['legpress','hipthrust','pulldown','chestpress','legcurl']},
+   B:{name:'Antrenman B',sub:'Bacak · kalça · sırt · omuz',ex:['goblet','backext','cablerow','shoulderpress','abductor']}},
+ ev:{
+   A:{name:'Antrenman A',sub:'Evde · bacak · kalça · sırt · göğüs',ex:['e_goblet','e_hipthrust','e_row','e_pushup']},
+   B:{name:'Antrenman B',sub:'Evde · bacak · sırt · omuz',ex:['e_split','e_slide','e_row','e_ohp']}}
+};
+var MODEN={ev:'Ev',salon:'Salon'};
+var WARMUPS={
+ salon:'Her hareketin ilk setinden önce, o günkü kilonun yarısıyla 8–10 tekrarlık bir ısınma seti yap. Ayrı ısınma koşusu gerekmez.',
+ ev:'Her hareketin ilk setinden önce ağırlıksız ya da bir alt seviyede 8–10 tekrarlık bir ısınma seti yap.'
+};
 
 /* ============ GÜNLÜK İPUÇLARI ============ */
 var TIPS=[
@@ -666,9 +755,18 @@ var FAQ=[
  ['Kilo 2–3 haftadır hiç düşmüyor.','Önce bel ölçüne bak: azalıyorsa yağ yakıyorsun. Ölçü de değişmiyorsa kalori girişlerini kontrol et (sos, içecek, atıştırmalık unutuluyor mu?). Sonra kaloriyi 100–150 düşür ya da günlük adımı 2.000 artır.'],
  ['Bakım kalorisi nedir, nasıl bulurum?','Kilonu korumak için günde yaktığın kalori. İnternette "bakım kalorisi hesaplama" diye aratabilir ya da Ayarlar\'daki hesaplayıcıyı kullanabilirsin. İkisi de tahmin; 3–4 hafta kilo ve kalori girdikten sonra uygulama gerçek bakım kalorini verilerinden hesaplar.'],
  ['Kaloriyi nasıl sayacağım?','Lifesum, MyFitnessPal ya da FatSecret gibi bir uygulamaya yediklerini yaz, gün sonunda toplam kalori ve proteini buraya gir. İlk haftalarda mutfak tartısı çok işe yarar.'],
- ['Neden karın hareketi ya da koşu bandı yok?','Karın kasları squat, hip thrust ve preslerde gövdeyi sabitlerken zaten çalışıyor; birkaç set ayrı karın hareketi göbek yağını eritmez. Yağı kalori açığı yakar. Kardiyonun yerini de günlük adım hedefi tutuyor: gün içinde yürümek, salonda koşu bandından daha sürdürülebilir.'],
+ ['Neden karın hareketi ya da kardiyo yok?','Karın kasları squat, hip thrust ve preslerde gövdeyi sabitlerken zaten çalışıyor; birkaç set ayrı karın hareketi göbek yağını eritmez. Yağı kalori açığı yakar. Kardiyonun yerini günlük adım hedefi tutuyor. Evdeki yürüyüş bandı antrenmanın parçası değil: dışarı çıkamadığın günlerde adım hedefini tamamlamak için.'],
+ ['Evde ağırlık sabit, nasıl ilerleyeceğim?','Kilo yerine seviye artar: ağırlıksız → 6 kg → 2 × 6 kg → tek bacak ya da yavaş tempo. Bir seviyede bütün setlerde üst sınıra ulaşınca uygulama bir sonraki seviyeyi önerir.'],
+ ['Ne zaman salona geçmeliyim?','Hazır hissettiğin zaman. Hareketlerin çoğunda en zor seviyeye geldiysen ev ağırlıkları yetmemeye başlamış demektir; salon seni daha hızlı ilerletir. Program sekmesinde "Salona geçtim"e basman yeterli.'],
  ['Regl dönemimde spor yapabilir miyim?','Evet. Kendini kötü hissedersen ağırlığı hafiflet ya da set sayısını azalt. Tartıdaki artış su tutulumu, dönem bitince geri iner.'],
  ['Salonda çekiniyorum.','Çok normal. Programın telefonunda, ne yapacağını bildiğin için kimseye sormana gerek yok. Makine doluysa alternatifi yap. Koltuk ayarında takılırsan salon görevlisine sormak tamamen normal.']
+];
+var HOMETIPS=[
+ 'Kanepe kaymasın: hip thrust ve split squat için arkası duvara dayalı olsun.',
+ 'Havluyla leg curl için parke ya da fayans zemin gerekir; halıda kaymaz.',
+ 'Dambılları ve havluyu hep aynı yerde tut; kurulum bir dakika sürsün.',
+ 'Yürüyüş bandı adım içindir: akşam adımın eksikse bantta tempolu yürü, telefon cebinde olsun ki adımlar sayılsın.',
+ 'Her seansın sonunda "Antrenmanı bitir"e bas; özet ve güç karşılaştırması çıkar.'
 ];
 var GYMTIPS=[
  'Her makinenin koltuk ve ped ayarını ilk seansta "Not"a yaz (ör. leg press koltuk 4). Sonraki seanslar hızlanır.',
@@ -679,7 +777,13 @@ var GYMTIPS=[
 
 /* ============ PROGRAM HESAPLARI ============ */
 function weekNo(d){if(!S.profile.startDate)return 1;var n=dayDiff(S.profile.startDate,d);return n<0?0:Math.floor(n/7)+1;}
-function learning(d){return weekNo(d)<=2;}
+/* ev / salon: günün antrenmanı hangi programdan? Set girilmiş ya da geçmiş günde kaydedilen
+   mod; yoksa şu anki mod. Eski (mod alanı olmayan) kayıtlar hareket adlarından anlaşılır. */
+function woModeOf(w){if(w&&w.mode)return w.mode;if(w&&w.sets&&Object.keys(w.sets).some(function(k){return k.indexOf('e_')===0;}))return 'ev';return 'salon';}
+function modeFor(d){var w=woOf(d);if(w&&(woAny(w)||d<today()))return woModeOf(w);return S.mode||'ev';}
+function modeStart(m){return (S.modeStart&&S.modeStart[m])||S.profile.startDate||today();}
+/* öğrenme dönemi her program için ayrı: salona geçince yeni makineler için 2 hafta yeniden */
+function learning(d){return dayDiff(modeStart(modeFor(d)),d)<14;}
 function setsFor(d){return learning(d)?2:3;}
 function isGymDay(d){return S.gymDays.indexOf(dow(d))>=0;}
 function woOf(d){var x=S.days[d];return x&&x.wo?x.wo:null;}
@@ -689,14 +793,17 @@ function woAny(w){return !!(w&&w.sets&&Object.keys(w.sets).some(function(k){retu
 /* yapılmış antrenman günleri (en az bir onaylı set) */
 function woDays(){return dayKeys().filter(function(d){return woAny(woOf(d));});}
 function lastWoBefore(d){var l=null;woDays().forEach(function(k){if(k<d)l=k;});return l;}
-/* A/B sırası takvime değil yapılan antrenmanlara göre: kaçırılan gün sırayı bozmaz */
+/* A/B sırası takvime değil yapılan antrenmanlara göre: kaçırılan gün sırayı bozmaz.
+   Evden salona geçince de sıra devam eder. */
 function woTypeFor(d){
-  var w=woOf(d);if(w&&w.type&&WO[w.type])return w.type;
+  var w=woOf(d);if(w&&(w.type==='A'||w.type==='B'))return w.type;
   var l=lastWoBefore(d);if(!l)return 'A';
   return woOf(l).type==='A'?'B':'A';
 }
+function WOD(d,ty){return PROG[modeFor(d)][ty||woTypeFor(d)];}
+function modeIds(m){var o=[];['A','B'].forEach(function(t){PROG[m][t].ex.forEach(function(id){if(o.indexOf(id)<0)o.push(id);});});return o;}
 function exDone(d,id){return okSets(setsOf(d,id)).length>=setsFor(d);}
-function woProg(d){var ty=woTypeFor(d),ids=WO[ty].ex,n=0;ids.forEach(function(id){if(exDone(d,id))n++;});return {n:n,total:ids.length,type:ty};}
+function woProg(d){var ty=woTypeFor(d),ids=WOD(d,ty).ex,n=0;ids.forEach(function(id){if(exDone(d,id))n++;});return {n:n,total:ids.length,type:ty};}
 function woFinished(d){var w=woOf(d);if(!w)return false;if(w.done)return true;var p=woProg(d);return p.n>=p.total;}
 function nextGymDay(from){for(var i=0;i<8;i++){var d=addD(from,i);if(isGymDay(d))return d;}return null;}
 
@@ -704,11 +811,16 @@ function nextGymDay(from){for(var i=0;i<8;i++){var d=addD(from,i);if(isGymDay(d)
 /* tahmini 1 tekrar maksimum (Epley): 20 kg×12 ile 22,5 kg×9 karşılaştırılabilsin.
    Sırt ekstansiyonunda vücudun üst yarısı da yüktür: sabit bir pay eklenir (kıyas için). */
 function bwRef(){return S.profile.startWeight||weightSeries().map(function(p){return p.v;})[0]||65;}
-function effLoad(id,kg){var e=EX[id];return (+kg||0)+(e&&e.bwAdd?bwRef()*e.bwAdd:0);}
+function optOf(id,s){var e=EX[id];if(!e||!e.opts)return null;var o=s&&s.o!=null?+s.o:null;return o!=null&&e.opts[o]?e.opts[o]:null;}
+function effLoad(id,s){
+  var e=EX[id],o=optOf(id,s);
+  if(o)return ((o.kg||0)+bwRef()*(o.bw!=null?o.bw:(e.bwAdd||0)))*(o.x||1);
+  return (+s.kg||0)+(e&&e.bwAdd?bwRef()*e.bwAdd:0);
+}
 function e1(kg,rep){return kg*(1+rep/30);}
 function sessVal(id,sets){
   var ok=okSets(sets);if(!ok.length)return null;
-  var b=0;ok.forEach(function(s){var v=e1(effLoad(id,s.kg),s.rep);if(v>b)b=v;});return b>0?b:null;
+  var b=0;ok.forEach(function(s){var v=e1(effLoad(id,s),s.rep);if(v>b)b=v;});return b>0?b:null;
 }
 function exHist(id){
   var out=[];
@@ -722,6 +834,12 @@ function prevSess(id,d){var h=exHist(id).filter(function(x){return x.d<d;});retu
 function kgLabel(id,kg){return (+kg===0&&EX[id].bwAdd)?'ağırlıksız':fk(kg)+' kg';}
 /* aynı kilodaki setleri grupla: "25 kg × 12 · 12 · 11" */
 function setsStr(id,sets){
+  var e=EX[id];
+  if(e&&e.opts){
+    var go=[],lo=null;
+    sets.forEach(function(s){var o=+s.o||0;if(lo&&lo.o===o)lo.r.push(s.rep);else{lo={o:o,r:[s.rep]};go.push(lo);}});
+    return go.map(function(x){return e.opts[x.o].s+' × '+x.r.join(' · ');}).join(' / ');
+  }
   var g=[],last=null;
   sets.forEach(function(s){var k=+s.kg||0;if(last&&last.kg===k)last.r.push(s.rep);else{last={kg:k,r:[s.rep]};g.push(last);}});
   return g.map(function(x){return kgLabel(id,x.kg)+' × '+x.r.join(' · ');}).join(' / ');
@@ -729,7 +847,8 @@ function setsStr(id,sets){
 function topKg(sets){var t=0;sets.forEach(function(s){if((+s.kg||0)>t)t=+s.kg||0;});return t;}
 /* bu seansta ne denensin? (çift ilerleme) */
 function suggest(d,id){
-  var e=EX[id],h=exHist(id).filter(function(x){return x.d<d;}),p=h.length?h[h.length-1]:null,lo=e.r[0],hi=e.r[1];
+  var e=EX[id];if(e.opts)return suggestLv(d,id);
+  var h=exHist(id).filter(function(x){return x.d<d;}),p=h.length?h[h.length-1]:null,lo=e.r[0],hi=e.r[1];
   if(!p){
     if(e.bwAdd)return {k:'first',kg:0,rep:lo,msg:'İlk kez yapıyorsun: ağırlıksız başla. Hareketi yavaş ve kontrollü öğren.'};
     return {k:'first',kg:null,rep:hi,msg:learning(d)
@@ -751,6 +870,28 @@ function suggest(d,id){
     return {k:'same',kg:top,rep:lo,msg:'Geçen sefer zorlandın. Aynı kiloda kal (<b>'+kgLabel(id,top)+'</b>) ve '+lo+' tekrara ulaşmaya çalış.'};
   }
   return {k:'same',kg:top,rep:Math.min(hi,first+1),msg:'Aynı kilo (<b>'+kgLabel(id,top)+'</b>), bir tekrar fazlasını dene. Bütün setlerde '+hi+' olunca kilo artacak.'};
+}
+
+/* evde: kilo yerine seviye (ağırlıksız → 6 kg → 2×6 kg → tek bacak / yavaş tempo) */
+function topO(sets){var t=0;sets.forEach(function(s){if((+s.o||0)>t)t=+s.o||0;});return t;}
+function suggestLv(d,id){
+  var e=EX[id],h=exHist(id).filter(function(x){return x.d<d;}),p=h.length?h[h.length-1]:null,lo=e.r[0],hi=e.r[1],L=e.opts.length;
+  if(!p){var o0=e.o0||0;
+    return {k:'first',o:o0,rep:lo,msg:'İlk kez yapıyorsun: <b>'+e.opts[o0].n+'</b> ile başla. '+(learning(d)?'Bugün amaç hareketi öğrenmek; yavaş ve kontrollü.':lo+'–'+hi+' tekrarı düzgün formla hedefle.')+(o0>0?' Zor gelirse bir alt seviyeyi seç.':'')};}
+  var top=topO(p.sets),ws=p.sets.filter(function(s){return (+s.o||0)===top;}),reps=ws.map(function(s){return s.rep;});
+  var allTop=ws.length>=setsFor(p.d)&&reps.every(function(r){return r>=hi;});
+  if(allTop){
+    if(top<L-1)return {k:'up',o:top+1,rep:lo,msg:'Geçen sefer bütün setlerde '+hi+' tekrar yaptın. Bugün bir üst seviye: <b>'+e.opts[top+1].n+'</b>; '+lo+' tekrar yeterli.'};
+    return {k:'same',o:top,rep:hi,msg:'Evdeki en zor seviyedesin ve '+hi+' tekrarı geçtin. Tekrarları daha yavaş yap. Salona geçince bu hareket ağırlıkla ilerlemeye devam eder.'};
+  }
+  var first=reps[0];
+  if(first<lo){
+    var p2=h.length>1?h[h.length-2]:null,below2=false;
+    if(p2){var t2=topO(p2.sets),f2=p2.sets.filter(function(s){return (+s.o||0)===t2;})[0];below2=t2===top&&f2&&f2.rep<lo;}
+    if(below2&&top>0)return {k:'down',o:top-1,rep:lo,msg:'İki seanstır '+lo+' tekrara ulaşamadın. Bugün bir alt seviye: <b>'+e.opts[top-1].n+'</b>. Formunu koru.'};
+    return {k:'same',o:top,rep:lo,msg:'Geçen sefer zorlandın. Aynı seviyede kal (<b>'+e.opts[top].n+'</b>) ve '+lo+' tekrara ulaşmaya çalış.'};
+  }
+  return {k:'same',o:top,rep:Math.min(hi,first+1),msg:'Aynı seviye (<b>'+e.opts[top].n+'</b>), bir tekrar fazlasını dene. Bütün setlerde '+hi+' olunca bir üst seviyeye geçeceksin.'};
 }
 
 /* ============ HAREKET ÇİZİMLERİ ============
@@ -840,6 +981,34 @@ var FIG={
    P('54,62 36,74 33,91')+P('66,62 84,74 87,91')+
    BX(23,66,7,16,3)+BX(90,66,7,16,3)+
    AR('M47,82 L37,82')+AR('M73,82 L83,82');}
+,
+ /* --- ev hareketleri --- */
+ rowOne:function(){return GND()+BX(18,62,52,9,4)+
+   HD(38,42)+P('46,48 80,52')+P('46,48 38,60')+P('80,52 92,72 86,90')+
+   P('74,52 78,76','g')+DB(79,80,'g')+
+   P('74,52 80,62 70,62')+DB(68,62)+AR('M92,74 Q98,62 92,56');},
+ ohp:function(){return BX(44,74,32,8,3)+P('76,74 78,44')+
+   HD(60,26)+P('60,40 60,72')+P('46,42 74,42')+
+   P('46,42 34,44 34,52','g')+DB(34,56,'g')+P('74,42 86,44 86,52','g')+DB(86,56,'g')+
+   P('46,42 40,30 40,22')+DB(40,18)+P('74,42 80,30 80,22')+DB(80,18)+
+   AR('M60,50 L60,28');},
+ /* şınav: aşağıda (kesikli) → kollar düz (koyu) */
+ pushUp:function(){return GND()+
+   HD(29,77,'g')+P('38,81 104,90','g')+P('38,81 50,86 36,92','g')+
+   HD(26,58)+P('35,63 70,77 104,90')+P('35,63 36,92')+P('36,92 30,92')+
+   AR('M14,86 L14,60');},
+ /* bulgarian split squat: arka ayak kanepede */
+ splitSquat:function(){return GND()+BX(4,64,26,29,4)+
+   P('74,92 70,70 60,48','g')+P('60,48 44,62 26,66','g')+P('60,48 61,24','g')+HD(62,13,'g')+
+   P('74,92 80,70 56,66')+P('56,66 44,86 27,66')+P('56,66 58,42')+HD(60,30)+
+   P('58,46 67,55 67,47')+DBV(70,49)+P('74,92 84,92')+
+   AR('M100,30 L100,60');},
+ /* havluyla leg curl: bacak düz (kesikli) → topuk kalçaya (koyu), kalça havada */
+ slideCurl:function(){return GND()+
+   HD(14,85)+P('23,88 42,90')+
+   P('24,88 60,84 106,90','g')+'<rect x="98" y="90" width="14" height="3" rx="1.5" fill="none" stroke="'+FI.gh+'" stroke-width="2"/>'+
+   P('24,88 56,70 78,58 86,89')+'<rect x="79" y="90" width="15" height="3" rx="1.5" fill="'+FI.eq+'"/>'+
+   AR('M106,80 Q100,68 90,78');}
 };
 var figN=0;
 function figSVG(key){
@@ -986,20 +1155,20 @@ function plannedSince(){
 }
 
 /* ============ GÜÇ / KAS KORUMA ============ */
-var KGEX=Object.keys(EX);
 /* her hareketin ilk seansına göre güç oranı; endeks = ortalama */
 function strength(){
   var rows=[],idx=[];
-  KGEX.forEach(function(id){
+  var ids=modeIds(S.mode);
+  ids.forEach(function(id){
     var h=exHist(id);if(!h.length)return;
     var f=h[0],l=h[h.length-1],best=0;h.forEach(function(x){if(x.v>best)best=x.v;});
     rows.push({id:id,first:f,last:l,best:best,n:h.length,pct:h.length>1?(l.v/f.v-1)*100:null});
   });
   /* endeks çizgisi: her antrenman gününde, o güne kadarki son değer / ilk değer */
-  var dates=woDays();
+  var dates=woDays().filter(function(d){return woModeOf(woOf(d))===S.mode;});
   dates.forEach(function(d){
     var r=[];
-    KGEX.forEach(function(id){
+    ids.forEach(function(id){
       var h=exHist(id).filter(function(x){return x.d<=d;});
       if(h.length>=1)r.push(h[h.length-1].v/h[0].v);
     });
@@ -1096,7 +1265,7 @@ function heroCard(d){
   var sub;
   if(isT){
     if(fin)sub='Antrenmanı bitirdin, harikasın! Şimdi beslenme ve adım.';
-    else if(gym)sub='Bugün '+WO[wp.type].name+' seni bekliyor.';
+    else if(gym)sub='Bugün '+WOD(d,wp.type).name+' seni bekliyor'+(modeFor(d)==='ev'?' (evde).':'.');
     else if(g.n>=g.total&&g.total)sub='Bütün hedeflerin tamam. Mükemmel bir gün!';
     else sub='Bugün dinlen, yürü ve hedeflerine odaklan.';
   }else sub=logged(d)?'Bu günün kayıtları':'Bu güne kayıt girilmemiş. Şimdi ekleyebilirsin.';
@@ -1118,7 +1287,7 @@ function heroCard(d){
     '<div class="kpis"><div class="kpi '+k1c+'">'+k1+'</div><div class="kpi '+k2c+'">'+k2+'</div><div class="kpi '+k3c+'">'+k3+'</div><div class="kpi '+k4c+'">'+k4+'</div></div></div>';
 }
 function woCta(d){
-  var gym=isGymDay(d),w=woOf(d),any=woAny(w),p=woProg(d),W=WO[p.type],fin=woFinished(d);
+  var gym=isGymDay(d),w=woOf(d),any=woAny(w),p=woProg(d),W=WOD(d,p.type),fin=woFinished(d),md=modeFor(d);
   if(!gym&&!any){
     return '<div class="card k k-grn cta" data-a="tab" data-t="antrenman"><div class="ic">'+IC.leaf+'</div><div class="tx">'+
       '<div class="eyebrow">Dinlenme günü</div><h3>Kaslar dinlenirken güçlenir</h3>'+
@@ -1126,7 +1295,7 @@ function woCta(d){
       '<span class="go" style="background:var(--card2);color:var(--ink2);border:1px solid var(--line)">Yine de →</span></div>';
   }
   return '<div class="card k k-grn cta" data-a="tab" data-t="antrenman"><div class="ic">'+IC.gym+'</div><div class="tx">'+
-    '<div class="eyebrow">'+(learning(d)?'Öğrenme · ':'')+W.ex.length+' hareket · ~'+(learning(d)?40:55)+' dk</div>'+
+    '<div class="eyebrow">'+MODEN[md]+' · '+(learning(d)?'öğrenme · ':'')+W.ex.length+' hareket · ~'+(md==='ev'?(learning(d)?25:35):(learning(d)?40:55))+' dk</div>'+
     '<h3>'+W.name+'</h3><div class="sub">'+W.sub+(any?' · '+p.n+'/'+p.total+' tamam':'')+'</div></div>'+
     '<span class="go'+(fin?' done':'')+'">'+(fin?'Bitti ✓':any?'Devam →':'Başla →')+'</span></div>';
 }
@@ -1211,16 +1380,16 @@ function backupBanner(){
 /* ============ ANTRENMAN ============ */
 function ytUrl(q){return 'https://www.youtube.com/results?search_query='+encodeURIComponent(q);}
 function vWorkout(){
-  var d=cur,p=woProg(d),ty=p.type,W=WO[ty],w=woOf(d),any=woAny(w),wk=weekNo(d),ids=W.ex,n=ids.length;
+  var d=cur,p=woProg(d),ty=p.type,W=WOD(d,ty),md=modeFor(d),w=woOf(d),any=woAny(w),wk=weekNo(d),ids=W.ex,n=ids.length;
   if(exIdx>=n)exIdx=n-1;if(exIdx<0)exIdx=0;
   var h='';
   if(d!==today())h+=dayNav(d);
-  h+='<div class="card hero k k-grn"><div class="hl"><div style="min-width:0"><div class="eyebrow">'+(wk>0?'Hafta '+wk+' · ':'')+(learning(d)?'Öğrenme dönemi':'Ana dönem')+'</div>'+
+  h+='<div class="card hero k k-grn"><div class="hl"><div style="min-width:0"><div class="eyebrow">'+MODEN[md]+' · '+(wk>0?'hafta '+wk+' · ':'')+(learning(d)?'öğrenme dönemi':'ana dönem')+'</div>'+
      '<h1>'+W.name+'</h1><div class="sub">'+W.sub+'</div></div>'+ring(p.n,p.total,'#5a9677','hareket')+'</div>'+
      '<div class="row sb mt14"><div class="row gap6">'+['A','B'].map(function(t){
         return '<button class="chip ab'+(ty===t?' on g':'')+'" data-a="wotype" data-t="'+t+'" aria-label="Antrenman '+t+'">'+t+'</button>';}).join('')+'</div>'+
      '<div class="hint" style="text-align:right">'+(isGymDay(d)?'':'plan dışı gün<br>')+'hareket başına '+setsFor(d)+' set</div></div>';
-  if(!any)h+='<div class="note amb mt10"><b>Isınma:</b> '+WARMUP+'</div>';
+  if(!any)h+='<div class="note amb mt10"><b>Isınma:</b> '+WARMUPS[md]+'</div>';
   h+='</div>';
   h+='<div class="steps">'+ids.map(function(id,i){var ok=exDone(d,id);
       return '<button class="stp'+(i===exIdx?' on':'')+(ok?' ok':'')+'" data-a="exgo" data-n="'+i+'" aria-label="'+esc(EX[id].n)+'">'+(ok?IC.check:'')+(i+1)+'</button>';}).join('')+'</div>';
@@ -1237,7 +1406,7 @@ function exCard(d,id,i,n){
   var h='<div class="card ex">';
   h+='<div class="exh"><button class="fig" data-a="figbig" data-ex="'+id+'" aria-label="Çizimi büyüt">'+figSVG(e.fig)+'<span class="zm">'+IC.zoom+'</span></button>'+
      '<div style="min-width:0"><div class="eyebrow">'+(i+1)+' / '+n+' · hareket</div><h2>'+esc(e.n)+'</h2>'+
-     '<div class="meta">'+ns+' set × '+e.r[0]+'–'+e.r[1]+' tekrar · '+mmss(e.rest)+' dinlenme</div><div class="mus">'+esc(e.mus)+'</div></div></div>';
+     '<div class="meta">'+ns+' set × '+e.r[0]+'–'+e.r[1]+' tekrar'+(e.side?' ('+e.side+')':'')+' · '+mmss(e.rest)+' dinlenme</div><div class="mus">'+esc(e.mus)+'</div></div></div>';
   h+='<div class="sug '+sg.k+'"><div class="si">'+({up:'↑',same:'=',down:'↓',first:'!'})[sg.k]+'</div><p>'+sg.msg+'</p></div>';
   if(pv)h+='<div class="prev">Geçen sefer · '+fdate(pv.d)+': <b>'+esc(setsStr(id,pv.sets))+'</b></div>';
   h+='<div class="sets">';
@@ -1248,13 +1417,26 @@ function exCard(d,id,i,n){
 }
 function howHTML(e){
   return '<ol class="how-l">'+e.how.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ol>'+
+    (e.opts?'<div class="kv"><b>Seviyeler:</b><span>'+e.opts.map(function(o,i){return (i+1)+') '+esc(o.n);}).join(' → ')+'</span></div>':'')+
     '<div class="kv"><b>Dikkat:</b><span>'+esc(e.warn)+'</span></div>'+
-    '<div class="kv"><b>Doluysa:</b><span>'+esc(e.alt)+'</span></div>'+
+    '<div class="kv"><b>'+(e.opts?'Zor gelirse:':'Doluysa:')+'</b><span>'+esc(e.alt)+'</span></div>'+
     '<div class="kv"><b>Neden:</b><span>'+esc(e.why)+'</span></div>'+
     '<a class="vid" href="'+ytUrl(e.en)+'" target="_blank" rel="noopener">'+IC.play+'Videoda izle</a>';
 }
 function setRow(d,id,r,sg,ns){
-  var arr=setsOf(d,id),s=arr[r]||{},done=!!s.ok,extra=r>=ns;
+  var arr=setsOf(d,id),s=arr[r]||{},done=!!s.ok,extra=r>=ns,e=EX[id];
+  if(e.opts){
+    /* evde: kilo kutusu yerine seviye seçimi; önceki satırda seçilen seviye, yoksa öneri */
+    var po=sg.o;for(var q=r-1;q>=0;q--){if(arr[q]&&arr[q].o!=null){po=+arr[q].o;break;}}
+    var so=s.o!=null?+s.o:po;
+    var sn0=extra?'<button class="sn del" data-a="delset" data-ex="'+id+'" data-i="'+r+'" aria-label="Seti sil">✕</button>':'<span class="sn">'+(r+1)+'</span>';
+    return '<div class="srow lv'+(done?' done':'')+'">'+sn0+
+      '<select class="sinp sel" data-k="o" data-ex="'+id+'" data-i="'+r+'" aria-label="seviye">'+e.opts.map(function(o,i){
+        return '<option value="'+i+'"'+(i===so?' selected':'')+'>'+esc(o.s)+'</option>';}).join('')+'</select>'+
+      '<span class="x">×</span>'+
+      '<input class="sinp" inputmode="numeric" autocomplete="off" data-k="rep" data-ex="'+id+'" data-i="'+r+'" placeholder="'+sg.rep+'" value="'+esc(vstr(s.rep))+'" aria-label="tekrar">'+
+      '<button class="sok" data-a="setok" data-ex="'+id+'" data-i="'+r+'" aria-label="'+(r+1)+'. set tamam">'+IC.check+'</button></div>';
+  }
   /* kilo önerisi: bugün önceki sete yazılan kilo, yoksa uygulamanın önerisi */
   var phk=sg.kg;for(var j=r-1;j>=0;j--){if(arr[j]&&arr[j].kg!=null){phk=arr[j].kg;break;}}
   var sn=extra?'<button class="sn del" data-a="delset" data-ex="'+id+'" data-i="'+r+'" aria-label="Seti sil">✕</button>':'<span class="sn">'+(r+1)+'</span>';
@@ -1266,8 +1448,10 @@ function setRow(d,id,r,sg,ns){
 }
 function ensureWo(d){
   var x=DW(d);
-  if(!x.wo)x.wo={type:woTypeFor(d),sets:{}};
+  if(!x.wo)x.wo={type:woTypeFor(d),mode:modeFor(d),sets:{}};
   if(!x.wo.type)x.wo.type=woTypeFor(d);
+  /* henüz set girilmediyse program (ev/salon) şu anki moda uyar */
+  if(!woAny(x.wo))x.wo.mode=d<today()?(x.wo.mode||S.mode):S.mode;
   if(!x.wo.sets)x.wo.sets={};
   return x.wo;
 }
@@ -1279,7 +1463,7 @@ function exSheet(id){
   var h='<h2>'+esc(e.n)+'</h2><div class="sub">'+esc(e.mus)+'</div>'+
     '<div class="bigfig">'+figSVG(e.fig)+'</div>'+
     '<div class="legend"><span><i class="dash" style="border-color:#c9b7be"></i>başlangıç</span><span><i style="border-color:#3b3236"></i>bitiş</span><span><i style="border-color:#d39536"></i>hareketin yönü</span></div>'+
-    '<div class="note mt14"><b>'+setsFor(cur)+' set × '+e.r[0]+'–'+e.r[1]+' tekrar</b> · setler arası '+mmss(e.rest)+' dinlen</div>'+
+    '<div class="note mt14"><b>'+setsFor(cur)+' set × '+e.r[0]+'–'+e.r[1]+' tekrar'+(e.side?' ('+e.side+')':'')+'</b> · setler arası '+mmss(e.rest)+' dinlen</div>'+
     '<div class="eyebrow mt14">Nasıl yapılır</div>'+howHTML(e);
   var hs=exHist(id).slice(-6).reverse();
   if(hs.length){
@@ -1292,7 +1476,7 @@ function exSheet(id){
 /* ============ ANTRENMAN ÖZETİ ============ */
 function summarySheet(d){
   var w=woOf(d);if(!w)return;
-  var ty=w.type||woTypeFor(d),W=WO[ty],nset=0,vol=0,rows='',ups=0,downs=0,prs=[],nex=0;
+  var ty=w.type||woTypeFor(d),W=WOD(d,ty),nset=0,vol=0,rows='',ups=0,downs=0,prs=[],nex=0;
   W.ex.forEach(function(id){
     var e=EX[id],ss=okSets(setsOf(d,id));if(!ss.length)return;
     nex++;nset+=ss.length;
@@ -1504,7 +1688,9 @@ function spark(pts){
 }
 function strengthCard(){
   var st=strength(),lost=lostKg();
-  var h='<div class="card k k-grn"><div class="ch"><h2>Kesimdeki güç</h2><span class="meta">kas koruması</span></div>';
+  var other=S.mode==='ev'?'salon':'ev',oh=woDays().some(function(d){return woModeOf(woOf(d))===other;});
+  var h='<div class="card k k-grn"><div class="ch"><h2>Kesimdeki güç</h2><span class="meta">'+MODEN[S.mode]+' programı</span></div>'+
+    (oh?'<div class="hint mb10">Endeks şu anki '+(S.mode==='ev'?'ev':'salon')+' programının hareketlerinden, '+(S.mode==='ev'?'evdeki':'salondaki')+' ilk seansa göre hesaplanıyor. '+MODEN[other]+' kayıtların Rekorlar\'da duruyor.</div>':'');
   if(!st.rows.length)return h+'<div class="hint">İlk antrenmanından sonra her hareketin gücü burada görünür. Kilo verirken güç korunuyor ya da artıyorsa, verdiğin kilo yağdır; kasın yerinde duruyor.</div></div>';
   if(st.n){
     var last=st.idx.length?st.idx[st.idx.length-1].v:100;
@@ -1584,38 +1770,64 @@ function monthCal(){
 }
 
 /* ============ PROGRAM ============ */
+var progView=null;
+function modeCard(view){
+  var cur_=S.mode,v=view||cur_;
+  var h='<div class="card"><div class="row gap6">'+['ev','salon'].map(function(m){
+      return '<button class="chip'+(v===m?' on':'')+'" data-a="pview" data-m="'+m+'" style="flex:1;padding:11px">'+(m==='ev'?'Ev programı':'Salon programı')+(cur_===m?' ✓':'')+'</button>';}).join('')+'</div>';
+  if(v!==cur_)h+='<div class="note acc mt10">Şu an <b>'+MODEN[cur_].toLocaleLowerCase('tr-TR')+'</b> programını kullanıyorsun. Bu programa geçince '+(v==='salon'&&!S.modeStart.salon?'salon hareketleri için 2 haftalık öğrenme dönemi başlar, ':'')+'güç endeksi ve öneriler bu programın hareketlerine göre hesaplanır. Eski kayıtların silinmez.'+
+    '<div class="row mt10"><button class="btn sm" data-a="mode" data-m="'+v+'">'+(v==='salon'?'Salona geçtim, bu programa geç':'Eve döndüm, bu programa geç')+'</button></div></div>';
+  return h+'</div>';
+}
 function vProgram(){
-  var d=today(),wk=weekNo(d),t=S.targets;
-  var h='<div class="card hero k k-acc"><div class="eyebrow">'+(S.profile.startDate?'Hafta '+wk+' · '+(learning(d)?'öğrenme dönemi':'ana dönem'):'Program')+'</div>'+
-    '<h1>Haftada 3 gün, tam vücut</h1><div class="sub">Her seans 5 hareket, yaklaşık 45 dakika. Amaç: yağ yakarken kası korumak, hatta güçlenmek.</div>'+
+  var d=today(),wk=weekNo(d),t=S.targets,v=progView||S.mode,isEv=v==='ev';
+  var L=v===S.mode?learning(d):!S.modeStart[v]||dayDiff(S.modeStart[v],d)<14,ns=L?2:3;
+  var h=modeCard(v);
+  h+='<div class="card hero k k-acc"><div class="eyebrow">'+(isEv?'Ev':'Salon')+(v===S.mode&&S.profile.startDate?' · hafta '+wk+' · '+(L?'öğrenme dönemi':'ana dönem'):'')+'</div>'+
+    '<h1>Haftada 3 gün, tam vücut</h1>';
+  if(isEv)h+='<div class="sub">Her seans 4 hareket, yaklaşık 35 dakika. Malzeme: 2 adet 6 kg dambıl, kanepe ve havlu.</div>'+
+    '<ul class="dots mt14">'+
+      '<li><b>Ağırlık sabit, seviye artar.</b> Kilo yerine seviye yükselir: ağırlıksız → 6 kg → 2 × 6 kg → tek bacak ya da yavaş tempo.</li>'+
+      '<li><b>Tek bacak hareketler.</b> Vücut ağırlığı ikiye bölünmediği için hafif dambılla bile bacak ve kalça yeterince yüklenir.</li>'+
+      '<li><b>Her seansta bütün vücut.</b> Bacak, kalça, sırt ve göğüs/omuz; her kalıp bir kez.</li>'+
+      '<li><b>Yürüyüş bandı antrenmanın parçası değil.</b> Adım hedefine yetişemediğin günlerde bantta yürü.</li>'+
+    '</ul></div>';
+  else h+='<div class="sub">Her seans 5 hareket, yaklaşık 45 dakika. Amaç: yağ yakarken kası korumak, hatta güçlenmek.</div>'+
     '<ul class="dots mt14">'+
       '<li><b>Her seansta bütün vücut.</b> Her kas haftada 1–2 kez çalışır; yeni başlayan için en hızlı ilerleme bu.</li>'+
       '<li><b>Makine ve kablo ağırlıklı.</b> Yörünge sabit, öğrenmesi kolay, yardımcı gerekmez.</li>'+
       '<li><b>Bacak ve kalça ağırlıklı.</b> En büyük kaslar en çok enerjiyi harcar ve vücudun şeklini en çok bunlar değiştirir.</li>'+
-      '<li><b>Gereksiz hareket yok.</b> Her seansta her hareket kalıbı bir kez. Ayrı karın hareketi ve koşu bandı yok; nedeni aşağıda, Sık Sorulanlar\'da.</li>'+
+      '<li><b>Gereksiz hareket yok.</b> Her seansta her hareket kalıbı bir kez. Ayrı karın hareketi ve kardiyo yok; nedeni Sık Sorulanlar\'da.</li>'+
     '</ul></div>';
   /* haftalık plan */
   h+='<div class="card"><div class="ch"><h2>Haftan</h2><span class="meta" data-a="tab" data-t="ayarlar" style="color:var(--acc2)">günleri değiştir</span></div><div class="week">';
   var seq=planSeq();
   WEEKORDER.forEach(function(g){var on=S.gymDays.indexOf(g)>=0;
     h+='<div class="'+(on?'g':'')+'"><b>'+GUN[g]+'</b><span>'+(on?(seq[g]||'spor'):'adım')+'</span></div>';});
-  h+='</div><div class="hint mt10">A ve B sırayla gelir. Bir günü kaçırırsan sıra bozulmaz; bir sonraki spor gününde sıradaki antrenmanı yaparsın. Spor olmayan günlerde iş, günlük adım hedefin.</div></div>';
+  h+='</div><div class="hint mt10">A ve B sırayla gelir. Bir günü kaçırırsan sıra bozulmaz; bir sonraki antrenman gününde sıradaki antrenmanı yaparsın. Evden salona geçince de sıra devam eder. Antrenman olmayan günlerde iş, günlük adım hedefin.</div></div>';
   /* dönemler */
-  var L=learning(d);
   h+='<div class="card"><div class="ch"><h2>Dönemler</h2></div><div class="phase">'+
-    '<div class="'+(L?'on':'')+'"><b>Hafta 1–2 · Öğrenme</b><span>Her hareket 2 set. Hafif ağırlık, amaç formu öğrenmek ve makine ayarlarını bulmak.</span></div>'+
-    '<div class="'+(L?'':'on')+'"><b>Hafta 3+ · Ana dönem</b><span>Her hareket 3 set. Son 1–2 tekrar zorlamalı; kilo, kurala göre artar.</span></div></div></div>';
+    '<div class="'+(L?'on':'')+'"><b>İlk 2 hafta · Öğrenme</b><span>Her hareket 2 set. '+(isEv?'Kolay seviyede, amaç formu öğrenmek.':'Hafif ağırlık, amaç formu öğrenmek ve makine ayarlarını bulmak.')+'</span></div>'+
+    '<div class="'+(L?'':'on')+'"><b>Sonrası · Ana dönem</b><span>Her hareket 3 set. Son 1–2 tekrar zorlamalı; '+(isEv?'seviye':'kilo')+', kurala göre artar.</span></div></div>'+
+    (isEv?'':'<div class="hint mt10">Evden salona geçince yeni hareketler için öğrenme dönemi salonda yeniden başlar.</div>')+'</div>';
   /* antrenmanlar */
   ['A','B'].forEach(function(k){
-    var W=WO[k];
+    var W=PROG[v][k];
     h+='<div class="card k k-grn"><div class="ch"><h2>'+W.name+'</h2><span class="meta">'+W.sub+'</span></div><div class="lst">'+
       W.ex.map(function(id,i){var e=EX[id];
         return '<div class="it" data-a="figbig" data-ex="'+id+'" style="cursor:pointer"><div class="mf">'+figSVG(e.fig)+'</div><div class="tx"><b>'+(i+1)+'. '+esc(e.n)+'</b>'+
-          '<span>'+esc(e.mus)+'</span></div><div class="rt">'+setsFor(d)+' × '+e.r[0]+'–'+e.r[1]+'<small>'+mmss(e.rest)+' dinlenme</small></div></div>';}).join('')+
-      '</div><div class="hint mt6">Harekete dokun: büyük çizim, nasıl yapılır, video.</div></div>';
+          '<span>'+esc(e.mus)+(e.side?' · '+e.side:'')+'</span></div><div class="rt">'+ns+' × '+e.r[0]+'–'+e.r[1]+'<small>'+mmss(e.rest)+' dinlenme</small></div></div>';}).join('')+
+      '</div><div class="hint mt6">Harekete dokun: büyük çizim, nasıl yapılır'+(isEv?', seviyeler':'')+', video.</div></div>';
   });
   /* ilerleme kuralı */
-  h+='<div class="card k k-amb"><div class="ch"><h2>Kilo ne zaman artar?</h2></div>'+
+  if(isEv)h+='<div class="card k k-amb"><div class="ch"><h2>Seviye ne zaman artar?</h2></div>'+
+    '<ul class="dots"><li>Her hareketin bir tekrar aralığı var (ör. 10–15). <b>Bütün setlerde üst sınıra</b> ulaşınca bir sonraki seansta bir üst seviyeye geçersin.</li>'+
+    '<li>Seviye artınca tekrar düşer, bu normal. Aynı seviyede her seans bir tekrar eklemeye çalış.</li>'+
+    '<li>Her seti <b>1–2 tekrar daha yapabilecek gibi</b> bitir. Formun bozulduğu tekrar sayılmaz.</li>'+
+    '<li>Antrenman ekranında seviyeyi seç, tekrarı gir, ✓\'e bas. Uygulama ne deneyeceğini zaten yazıyor.</li></ul>'+
+    '<div class="note mt10"><b>Örnek · Goblet squat 3 × 10–15</b><br>6 kg × 15 · 15 · 15 → sonraki seans <b>2 × 6 kg</b><br>2 × 6 kg × 11 · 10 · 10 → bu seviyede kal, tekrar ekle</div>'+
+    '<div class="hint mt10">Hareketlerin çoğunda en zor seviyeye geldiysen ev ağırlıkları yetmemeye başlamış demektir; salona geçmenin zamanı.</div></div>';
+  else h+='<div class="card k k-amb"><div class="ch"><h2>Kilo ne zaman artar?</h2></div>'+
     '<ul class="dots"><li>Her hareketin bir tekrar aralığı var (ör. 10–15). <b>Bütün setlerde üst sınıra</b> ulaşınca bir sonraki seansta kilo bir kademe artar.</li>'+
     '<li>Kilo artınca tekrar düşer (ör. 15 → 10), bu normal. Aynı kiloda her seans bir tekrar eklemeye çalış.</li>'+
     '<li>Her seti <b>1–2 tekrar daha yapabilecek gibi</b> bitir. Formun bozulduğu tekrar sayılmaz.</li>'+
@@ -1632,7 +1844,7 @@ function vProgram(){
     '<li><b>Tartı</b> her sabah aynı koşulda. Tek güne değil trend çizgisine ve haftalık ortalamaya bak.</li>'+
     '<li><b>Bel ve kalça</b> haftada bir ölç. Tartı dursa bile santimler iniyorsa yağ gidiyor.</li></ul></div>';
   /* salon */
-  h+='<div class="card"><div class="ch"><h2>Salonda</h2></div><ul class="dots">'+GYMTIPS.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>';
+  h+='<div class="card"><div class="ch"><h2>'+(isEv?'Evde':'Salonda')+'</h2></div><ul class="dots">'+(isEv?HOMETIPS:GYMTIPS).map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>';
   /* sss */
   h+='<div class="card"><div class="ch"><h2>Sık sorulanlar</h2></div><div class="faq">'+FAQ.map(function(q){
     return '<details><summary>'+esc(q[0])+'</summary><p>'+esc(q[1])+'</p></details>';}).join('')+'</div></div>';
@@ -1690,7 +1902,10 @@ function vSettings(){
   h+='<div class="card"><div class="ch"><h2>Günlük hedefler</h2></div><div class="grid2">'+
     tf('kcal','Kalori','kcal',t.kcal,kcalSugText())+tf('protein','Protein','g',t.protein,protSugText())+
     tf('steps','Adım','',t.steps,null)+tf('sleep','Uyku','saat',t.sleep,null)+'</div></div>';
-  h+='<div class="card"><div class="ch"><h2>Spor günleri</h2><span class="meta">'+S.gymDays.length+' gün</span></div><div class="days7">'+
+  h+='<div class="card"><div class="ch"><h2>Antrenman yeri</h2><span class="meta">'+MODEN[S.mode]+' programı</span></div><div class="row gap6">'+
+    ['ev','salon'].map(function(m){return '<button class="chip'+(S.mode===m?' on':'')+'" data-a="mode" data-m="'+m+'" style="flex:1;padding:11px">'+(m==='ev'?'Evde':'Salonda')+'</button>';}).join('')+
+    '</div><div class="hint mt10">Salona geçince salon programı açılır; güç endeksi ve öneriler salon hareketlerine göre baştan hesaplanır. Eski kayıtlar silinmez.</div></div>';
+  h+='<div class="card"><div class="ch"><h2>Antrenman günleri</h2><span class="meta">'+S.gymDays.length+' gün</span></div><div class="days7">'+
     WEEKORDER.map(function(g){return '<button class="chip'+(S.gymDays.indexOf(g)>=0?' on':'')+'" data-a="gymday" data-n="'+g+'">'+GUN[g]+'</button>';}).join('')+
     '</div><div class="hint mt10">Haftada 3 gün önerilir; aralarda en az bir gün boşluk olsun (ör. Pzt · Çar · Cum).</div></div>';
   h+='<div class="card"><button class="tgl'+(S.cycle?' on':'')+'" data-a="cycle"><span class="sw"></span><span class="tt">Regl takibi<small>Bugün ekranında "Regl dönemindeyim" düğmesi; kilo grafiğinde o günler işaretlenir.</small></span></button></div>';
@@ -1735,7 +1950,7 @@ function setMaint(v,src){
 }
 
 /* ============ İLK AÇILIŞ ============ */
-var SU={name:'',age:24,height:null,w:null,goal:null,days:[1,3,5],maint:null,f:1.46};
+var SU={mode:'ev',name:'',age:24,height:null,w:null,goal:null,days:[1,3,5],maint:null,f:1.46};
 function vSetup(){
   var h='<div class="setup"><div class="welcome">'+LOGO+'<h1>Merhaba!</h1>'+
     '<p>Sana özel program: haftada 3 gün salon antrenmanı, her hareketin çizimi ve nasıl yapıldığı, kilo, kalori, protein ve adım takibi.</p></div>';
@@ -1748,6 +1963,10 @@ function vSetup(){
     suf('age','Yaş','','numeric',SU.age)+suf('height','Boy','cm','numeric',SU.height)+
     suf('w','Şu anki kilon','kg','decimal',SU.w)+suf('goal','Hedef kilon','kg','decimal',SU.goal)+
     '</div><div class="hint mt10">Kilonu sabah, kahvaltıdan önce tartıp yaz. Hedeften emin değilsen ilk hedef olarak 4–5 kg iyi bir başlangıç; sonra değiştirebilirsin.</div></div>';
+  h+='<div class="card"><div class="ch"><h2>Nerede çalışacaksın?</h2></div><div class="row gap6">'+
+    '<button class="chip'+(SU.mode==='ev'?' on':'')+'" data-a="sumode" data-m="ev" style="flex:1;padding:12px">Evde</button>'+
+    '<button class="chip'+(SU.mode==='salon'?' on':'')+'" data-a="sumode" data-m="salon" style="flex:1;padding:12px">Salonda</button></div>'+
+    '<div class="hint mt10">Evde: 2 adet 6 kg dambıl, kanepe ve havlu yeter. Salona geçtiğinde tek dokunuşla salon programına geçersin.</div></div>';
   h+='<div class="card"><div class="ch"><h2>Spor günlerin</h2><span class="meta">haftada 3 gün</span></div><div class="days7">'+
     WEEKORDER.map(function(g){return '<button class="chip'+(SU.days.indexOf(g)>=0?' on':'')+'" data-a="sugym" data-n="'+g+'">'+GUN[g]+'</button>';}).join('')+
     '</div><div class="hint mt10">Aralarda bir gün boşluk olsun. Bir günü kaçırırsan sorun değil, program sıradaki antrenmanla devam eder.</div></div>';
@@ -1776,7 +1995,7 @@ function welcomeSheet(){
   openSheet('<h2>Hazırsın'+(nm?', '+esc(nm):'')+'!</h2><div class="sub">'+(nd?'İlk antrenmanın: <b>'+(nd===today()?'bugün':GUNU[dow(nd)])+'</b> · Antrenman A':'')+'</div>'+
     '<ol class="how-l mt14"><li><b>Her sabah</b> tartıl, Bugün sekmesine yaz.</li>'+
     '<li><b>Gün sonunda</b> kalori, protein ve adımı gir.</li>'+
-    '<li><b>Spor günü</b> Antrenman sekmesini aç: her hareketin çizimi, nasıl yapılacağı ve kaç kilo deneyeceğin orada. Her seti girince ✓\'e bas, dinlenme sayacı başlar.</li>'+
+    '<li><b>Spor günü</b> Antrenman sekmesini aç: her hareketin çizimi, nasıl yapılacağı ve ne deneyeceğin orada. Her seti girince ✓\'e bas, dinlenme sayacı başlar.</li>'+
     '<li><b>İlerleme</b> sekmesinde kaç kilo verdiğini ve gücünün nasıl gittiğini gör.</li></ol>'+
     '<div class="note mt10">Programın tamamı, nedenleri ve sık sorulan sorular <b>Program</b> sekmesinde.</div>'+
     '<button class="btn wide big mt14" data-a="shclose">Başlayalım</button>');
@@ -1785,7 +2004,7 @@ function welcomeSheet(){
 /* ============ YEDEK DOSYASI ============ */
 function payload(){
   return {app:'form-kardes',v:1,profile:S.profile,maint:S.maint,maintSrc:S.maintSrc,targets:S.targets,
-    gymDays:S.gymDays,cycle:S.cycle,days:S.days,_st:S._st,created:S.created||0};
+    gymDays:S.gymDays,mode:S.mode,modeStart:S.modeStart,cycle:S.cycle,days:S.days,_st:S._st,created:S.created||0};
 }
 /* gün gün birleştir: iki tarafta da en yeni kayıt kazanır; ayarlar _st'si yeni olandan gelir */
 function mergeIn(rm){
@@ -1796,7 +2015,7 @@ function mergeIn(rm){
     if(r&&(!l||(r._t||0)>(l._t||0))){S.days[d]=r;ch++;}
   });
   if((rm._st||0)>(S._st||0)){
-    ['profile','maint','maintSrc','targets','gymDays','cycle','created'].forEach(function(k){if(rm[k]!==undefined)S[k]=rm[k];});
+    ['profile','maint','maintSrc','targets','gymDays','mode','modeStart','cycle','created'].forEach(function(k){if(rm[k]!==undefined)S[k]=rm[k];});
     S._st=rm._st;ch++;normalize();
   }
   return ch;
@@ -2018,7 +2237,7 @@ function openSheet(h){
   s.classList.add('on');document.body.classList.add('noscroll');
 }
 function closeSheet(){var s=document.getElementById('sheet');s.classList.remove('on');s.innerHTML='';document.body.classList.remove('noscroll');}
-function firstOpenEx(d){var ids=WO[woTypeFor(d)].ex;for(var i=0;i<ids.length;i++)if(!exDone(d,ids[i]))return i;return 0;}
+function firstOpenEx(d){var ids=WOD(d).ex;for(var i=0;i<ids.length;i++)if(!exDone(d,ids[i]))return i;return 0;}
 function scrollToSteps(){var st=document.querySelector('.steps');if(st){var y=st.getBoundingClientRect().top+window.scrollY-74;if(window.scrollY>y)window.scrollTo(0,Math.max(0,y));}}
 function setBar(id,p,c){var el=document.getElementById(id);if(el){el.style.width=Math.round(clamp(p,0,1)*100)+'%';el.style.setProperty('--c',c);}}
 function liveToday(k){
@@ -2034,7 +2253,7 @@ function liveToday(k){
 
 /* ============ EYLEMLER ============ */
 var DO={};
-DO.tab=function(el){var t=el.getAttribute('data-t');if(!t)return;TAB=t;if(t==='antrenman')exIdx=firstOpenEx(cur);render();window.scrollTo(0,0);};
+DO.tab=function(el){var t=el.getAttribute('data-t');if(!t)return;TAB=t;progView=null;if(t==='antrenman')exIdx=firstOpenEx(cur);render();window.scrollTo(0,0);};
 DO.day=function(el){var d=addD(cur,+el.getAttribute('data-n'));if(d>today())return;cur=d;exIdx=firstOpenEx(cur);render();};
 DO.dtoday=function(){if(cur!==today()){cur=today();exIdx=firstOpenEx(cur);render();}};
 DO.gotoday=function(el){var d=el.getAttribute('data-d');if(!d||d>today())return;cur=d;TAB='bugun';render();window.scrollTo(0,0);};
@@ -2054,19 +2273,23 @@ DO.setok=function(el){
   var arr=ensureSets(d,id);while(arr.length<=i)arr.push({});
   var s=arr[i];
   if(s.ok){s.ok=0;DW(d);save();rerenderKeep();return;}
-  var row=el.closest('.srow'),ki=row.querySelector('[data-k="kg"]'),ri=row.querySelector('[data-k="rep"]');
-  var kg=num(ki.value),rep=int(ri.value);
-  if(kg==null&&ki.placeholder&&ki.placeholder!=='kg')kg=num(ki.placeholder);
-  if(kg==null){toast('Kaç kilo kaldırdığını yaz');ki.focus();return;}
+  var row=el.closest('.srow'),ki=row.querySelector('[data-k="kg"]'),oi=row.querySelector('[data-k="o"]'),ri=row.querySelector('[data-k="rep"]');
+  var kg=null,lv=null,rep=int(ri.value);
+  if(oi){lv=+oi.value;kg=e.opts[lv].kg;}
+  else{
+    kg=num(ki.value);
+    if(kg==null&&ki.placeholder&&ki.placeholder!=='kg')kg=num(ki.placeholder);
+    if(kg==null){toast('Kaç kilo kaldırdığını yaz');ki.focus();return;}
+  }
   if(rep==null)rep=int(ri.placeholder);
   if(!rep){toast('Kaç tekrar yaptığını yaz');ri.focus();return;}
   var best=0,had=false;exHist(id).forEach(function(x){if(x.d<d){had=true;if(x.v>best)best=x.v;}});
   var before=sessVal(id,arr)||0;
-  s.kg=kg;s.rep=rep;s.ok=1;s.at=Date.now();
+  s.kg=kg;s.rep=rep;s.ok=1;s.at=Date.now();if(lv!=null)s.o=lv;else delete s.o;
   var w=ensureWo(d);if(!w.t0)w.t0=Date.now();
   save();
   var nowv=sessVal(id,arr)||0,isPR=had&&nowv>best+0.01&&before<=best+0.01;
-  var done=okSets(arr).length,ns=setsFor(d),ids=WO[w.type].ex,pos=ids.indexOf(id),p=woProg(d);
+  var done=okSets(arr).length,ns=setsFor(d),ids=WOD(d,w.type).ex,pos=ids.indexOf(id),p=woProg(d);
   if(isPR)toast('Yeni rekor: '+e.n+' 🎉',2600);
   if(done<ns)restStart(e.rest,e.n+' · '+(done+1)+'. set');
   else if(p.n>=p.total){restStop();if(!isPR)toast('Bütün hareketler tamam. "Antrenmanı bitir"e bas.',2800);}
@@ -2099,6 +2322,21 @@ DO.protauto=function(){S.targets.protAuto=true;autoTargets();touchSettings();rer
 DO.gymday=function(el){var g=+el.getAttribute('data-n'),i=S.gymDays.indexOf(g);
   if(i>=0){if(S.gymDays.length<=1){toast('En az bir gün seç');return;}S.gymDays.splice(i,1);}else S.gymDays.push(g);
   S.gymDays.sort();touchSettings();rerenderKeep();};
+/* ev ⇄ salon. Geçmiş antrenmanlar kendi programında kalır; yeni programın öğrenme dönemi
+   ilk geçişte başlar; güç endeksi ve öneriler yeni programın hareketlerinden hesaplanır. */
+DO.pview=function(el){progView=el.getAttribute('data-m');if(progView===S.mode)progView=null;rerenderKeep();};
+DO.mode=function(el){
+  var m=el.getAttribute('data-m');if(m!=='ev'&&m!=='salon'||m===S.mode)return;
+  var first=!S.modeStart[m];
+  var msg=m==='salon'
+    ?'Salon programına geçiliyor.\n\n'+(first?'Salon hareketleri için 2 haftalık öğrenme dönemi başlar (hareket başına 2 set). ':'')+'Güç endeksi ve kilo önerileri salon hareketlerine göre hesaplanır. Ev kayıtların silinmez.'
+    :'Ev programına dönülüyor.\n\nGüç endeksi ve öneriler ev hareketlerine göre hesaplanır. Salon kayıtların silinmez.';
+  if(!confirm(msg))return;
+  S.mode=m;if(first)S.modeStart[m]=today();
+  var w=woOf(today());if(w&&!woAny(w)){w.mode=m;DW(today());}
+  exIdx=0;progView=null;touchSettings();rerenderKeep();
+  toast(m==='salon'?'Salon programı açık':'Ev programı açık');
+};
 DO.cycle=function(){S.cycle=!S.cycle;touchSettings();rerenderKeep();};
 DO.reload=function(){location.reload();};
 DO.wipe=function(){
@@ -2119,6 +2357,7 @@ DO.pushon=function(el){el.setAttribute('disabled','');pushEnable().then(function
 DO.pushoff=function(){pushDisable();rerenderKeep();};
 DO.pushtest=function(){pushTest();};
 /* kurulum */
+DO.sumode=function(el){SU.mode=el.getAttribute('data-m');document.querySelectorAll('[data-a="sumode"]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-m')===SU.mode);});};
 DO.sugym=function(el){var g=+el.getAttribute('data-n'),i=SU.days.indexOf(g);if(i>=0)SU.days.splice(i,1);else SU.days.push(g);el.classList.toggle('on',SU.days.indexOf(g)>=0);};
 DO.suf=function(el){SU.f=+el.getAttribute('data-n');document.querySelectorAll('[data-a="suf"]').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-n')===SU.f);});
   var h=document.getElementById('suhint');if(h)h.innerHTML=suHint();};
@@ -2136,6 +2375,7 @@ DO.sugo=function(){
   p.name=(SU.name||'').trim().slice(0,24);p.age=SU.age||null;p.height=SU.height||null;
   p.startWeight=SU.w||null;p.goalWeight=SU.goal||null;p.startDate=today();
   S.gymDays=SU.days.slice().sort();
+  S.mode=SU.mode||'ev';S.modeStart={};S.modeStart[S.mode]=today();
   var m=SU.maint,src=SU.calc?'calc':'manual';
   if(!m&&SU.w&&SU.height&&SU.age){m=calcMaint(SU.w,SU.height,SU.age,SU.f);src='calc';}
   S.maint=m||null;S.maintSrc=m?src:'';
@@ -2159,6 +2399,12 @@ function onSet(t){
   var k=t.getAttribute('data-k'),id=t.getAttribute('data-ex'),i=+t.getAttribute('data-i');
   if(!EX[id])return;
   var arr=ensureSets(cur,id);while(arr.length<=i)arr.push({});
+  if(k==='o'){
+    var lv=+t.value;arr[i].o=lv;arr[i].kg=EX[id].opts[lv].kg;save();
+    document.querySelectorAll('select[data-k="o"][data-ex="'+id+'"]').forEach(function(sel){
+      var j=+sel.getAttribute('data-i');if(j>i&&!(arr[j]&&arr[j].o!=null))sel.value=String(lv);});
+    return;
+  }
   var v=k==='kg'?num(t.value):int(t.value);
   if(v==null)delete arr[i][k];else arr[i][k]=v;
   if(arr[i].ok&&(arr[i].kg==null||!arr[i].rep))arr[i].ok=0;
@@ -2216,6 +2462,7 @@ document.addEventListener('change',function(ev){
   var t=ev.target;
   if(t.hasAttribute('data-imp')&&t.files&&t.files[0]){importBackup(t.files[0]);t.value='';}
   else if(t.getAttribute('data-p')==='startDate'){onProfile(t);rerenderKeep();}
+  else if(t.getAttribute('data-k')==='o')onSet(t);
 });
 document.addEventListener('focusin',function(ev){if(ev.target.matches&&ev.target.matches('input,textarea'))typing=true;});
 document.addEventListener('focusout',function(){

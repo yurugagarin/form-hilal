@@ -4,7 +4,20 @@ Yeni başlayan bir kadın için hazırlanmış zayıflama uygulaması. Haftada 3
 
 ## Program
 
-Haftada 3 gün tam vücut. A ve B sırayla gelir (A-B-A, sonraki hafta B-A-B). Bir gün kaçarsa sıra bozulmaz, bir sonraki spor gününde sıradaki antrenman yapılır.
+Haftada 3 gün tam vücut. A ve B sırayla gelir (A-B-A, sonraki hafta B-A-B). Bir gün kaçarsa sıra bozulmaz. İki program var: **Ev** ve **Salon**. Geçiş Program ya da Ayarlar sekmesinden tek dokunuşla yapılır.
+
+### Ev (2 adet 6 kg dambıl, kanepe, havlu)
+
+| Antrenman A | Set × tekrar | Antrenman B | Set × tekrar |
+|---|---|---|---|
+| Goblet squat | 3 × 10–15 | Bulgarian split squat | 3 × 8–12 (her bacak) |
+| Hip thrust (kanepede) | 3 × 10–15 | Havluyla leg curl | 3 × 8–12 |
+| Tek kol dambıl row | 3 × 10–15 (her kol) | Tek kol dambıl row | 3 × 10–15 (her kol) |
+| Şınav | 3 × 8–12 | Oturarak dambıl omuz press | 3 × 8–12 |
+
+Ağırlık sabit olduğu için kilo yerine **seviye** artar (ağırlıksız → 6 kg → 2 × 6 kg → tek bacak / yavaş tempo). Yürüyüş bandı antrenmanın parçası değil; adım hedefi için.
+
+### Salon
 
 | Antrenman A | Set × tekrar | Antrenman B | Set × tekrar |
 |---|---|---|---|
@@ -14,9 +27,10 @@ Haftada 3 gün tam vücut. A ve B sırayla gelir (A-B-A, sonraki hafta B-A-B). B
 | Göğüs press makinesi | 3 × 8–12 | Makine omuz press | 3 × 8–12 |
 | Oturarak leg curl | 3 × 10–15 | Abduktor makinesi | 3 × 12–15 |
 
-- **Hafta 1–2 öğrenme dönemi:** hareket başına 2 set, hafif ağırlık. Hafta 3'ten sonra 3 set.
-- **İlerleme (çift ilerleme):** bütün setlerde aralığın üst sınırına ulaşınca bir sonraki seansta kilo bir kademe artar. Uygulama her harekette ne deneneceğini yazar.
-- **Bilerek olmayanlar:** ayrı karın hareketi (karın bileşik hareketlerde zaten çalışıyor), koşu bandı/kardiyo (yerini günlük 10.000 adım tutuyor), Romanian deadlift (öğrenmesi zor, bele yük bindiriyor; yerine 45° sırt ekstansiyonu).
+- **Öğrenme dönemi:** her programın ilk 2 haftasında hareket başına 2 set, sonra 3 set. Salona geçince salon için yeniden başlar.
+- **İlerleme:** bütün setlerde aralığın üst sınırına ulaşınca bir sonraki seansta kilo (salonda) ya da seviye (evde) bir kademe artar. Uygulama her harekette ne deneneceğini yazar.
+- **Salona geçince:** güç endeksi ve öneriler salon hareketlerine göre baştan hesaplanır. Ev kayıtları silinmez, rekorlarda kalır.
+- **Bilerek olmayanlar:** ayrı karın hareketi, kardiyo (yerini günlük 10.000 adım tutuyor), Romanian deadlift.
 - **Beslenme:** kalori = bakım kalorisinin %20 altı (en çok 500 kcal açık, en az 1.300 kcal). Protein = hedef kilo × 1,8 g.
 
 ## Telefona kurulum
